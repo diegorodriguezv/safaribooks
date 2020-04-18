@@ -864,17 +864,18 @@ class SafariBooks:
         self.display.state(len(self.images), self.images_done_queue.qsize())
 
     def _start_multiprocessing(self, operation, full_queue):
-        if len(full_queue) > 5:
-            for i in range(0, len(full_queue), 5):
-                self._start_multiprocessing(operation, full_queue[i:i + 5])
-
-        else:
-            process_queue = [Process(target=operation, args=(arg,)) for arg in full_queue]
-            for proc in process_queue:
-                proc.start()
-
-            for proc in process_queue:
-                proc.join()
+        old_session = self.session
+        process_queue = [Process(target=operation, args=(arg,)) for arg in full_queue]
+        for proc in process_queue:
+            # Create a copy of the session for each process so that SSL works ok
+            new_session = requests.Session()
+            new_session.cookies = self.session.cookies
+            new_session.headers = self.session.headers
+            self.session = new_session
+            proc.start()
+        for proc in process_queue:
+            proc.join()
+        self.session = old_session
 
     def collect_css(self):
         self.display.state_status.value = -1
